@@ -19,3 +19,6 @@ __pycache__/
 # 외부 PDCA/bkit 도구가 남기는 머신별 세션 상태 (절대경로·타임스탬프 포함)
 docs/.pdca-status.json
 docs/.bkit-memory.json
+
+# 외부 axt 도구가 남기는 머신별 확장 프로필
+.axt-profile.json
