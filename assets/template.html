@@ -1,0 +1,1893 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Visualizer - __PROJECT_NAME__</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        /* ===== CSS Custom Properties ===== */
+        :root {
+            --sidebar-width: 280px;
+            --header-height: 56px;
+            --tab-height: 44px;
+            --detail-height: 200px;
+            --radius: 8px;
+            --transition: 0.25s ease;
+            --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #0f0f1a;
+            --bg-secondary: #1a1a2e;
+            --bg-tertiary: #16213e;
+            --bg-surface: #1e2a4a;
+            --bg-hover: #253561;
+            --text-primary: #e8e8f0;
+            --text-secondary: #9a9ab8;
+            --text-muted: #6a6a8a;
+            --border: #2a2a4a;
+            --border-active: #4a4a7a;
+            --accent: #6c63ff;
+            --accent-hover: #7b73ff;
+            --accent-glow: rgba(108, 99, 255, 0.15);
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --danger: #f87171;
+            --info: #60a5fa;
+            --tab-active-bg: #252550;
+            --tab-active-border: #6c63ff;
+            --detail-bg: #141428;
+            --tooltip-bg: #1e1e3a;
+            --tooltip-border: #3a3a6a;
+            --scrollbar-thumb: #3a3a5a;
+            --scrollbar-track: #1a1a2e;
+            --shadow: 0 4px 24px rgba(0,0,0,0.4);
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #f5f5fa;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f0f0f8;
+            --bg-surface: #e8e8f2;
+            --bg-hover: #dddde8;
+            --text-primary: #1a1a2e;
+            --text-secondary: #555570;
+            --text-muted: #8888a0;
+            --border: #d0d0e0;
+            --border-active: #a0a0c0;
+            --accent: #5b52e0;
+            --accent-hover: #4a42d0;
+            --accent-glow: rgba(91, 82, 224, 0.1);
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            --tab-active-bg: #e8e8f8;
+            --tab-active-border: #5b52e0;
+            --detail-bg: #fafafe;
+            --tooltip-bg: #ffffff;
+            --tooltip-border: #d0d0e0;
+            --scrollbar-thumb: #c0c0d0;
+            --scrollbar-track: #f0f0f8;
+            --shadow: 0 4px 24px rgba(0,0,0,0.08);
+        }
+
+        /* ===== Reset & Base ===== */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            font-family: var(--font-sans);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background var(--transition), color var(--transition);
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+        ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+
+        /* ===== Layout ===== */
+        .app {
+            display: grid;
+            grid-template-rows: var(--header-height) 1fr;
+            grid-template-columns: var(--sidebar-width) 1fr;
+            height: 100vh;
+        }
+
+        /* ===== Header ===== */
+        .header {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .header-logo {
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .header-title {
+            font-size: 16px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .header-title span {
+            color: var(--accent);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 12px;
+            transition: border-color var(--transition);
+        }
+
+        .search-box:focus-within {
+            border-color: var(--accent);
+        }
+
+        .search-box input {
+            background: none;
+            border: none;
+            outline: none;
+            color: var(--text-primary);
+            font-size: 13px;
+            width: 180px;
+            font-family: var(--font-sans);
+        }
+
+        .search-box input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .search-icon {
+            color: var(--text-muted);
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .theme-toggle {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+            transition: all var(--transition);
+            color: var(--text-primary);
+        }
+
+        .theme-toggle:hover {
+            border-color: var(--accent);
+            background: var(--bg-hover);
+        }
+
+        /* ===== Sidebar ===== */
+        .sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            padding: 20px 16px;
+            transition: background var(--transition), border-color var(--transition);
+        }
+
+        .sidebar-section {
+            margin-bottom: 24px;
+        }
+
+        .sidebar-section-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .stat-card {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 10px 12px;
+            transition: all var(--transition);
+        }
+
+        .stat-card:hover {
+            border-color: var(--border-active);
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--accent);
+            font-family: var(--font-mono);
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .lang-list {
+            list-style: none;
+        }
+
+        .lang-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+            font-size: 13px;
+        }
+
+        .lang-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .lang-name {
+            flex: 1;
+            color: var(--text-primary);
+        }
+
+        .lang-count {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .config-list {
+            list-style: none;
+        }
+
+        .config-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 0;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .config-icon {
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .entry-points-list {
+            list-style: none;
+        }
+
+        .entry-point {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding: 4px 8px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            margin-bottom: 4px;
+            word-break: break-all;
+        }
+
+        /* ===== Main Content ===== */
+        .main {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--bg-primary);
+        }
+
+        /* ===== Tabs ===== */
+        .tab-bar {
+            display: flex;
+            align-items: stretch;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 0 16px;
+            height: var(--tab-height);
+            flex-shrink: 0;
+        }
+
+        .tab-btn {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 16px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            font-family: var(--font-sans);
+            transition: color var(--transition);
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .tab-btn.active {
+            color: var(--accent);
+        }
+
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 12px;
+            right: 12px;
+            height: 2px;
+            background: var(--accent);
+            border-radius: 2px 2px 0 0;
+        }
+
+        .tab-icon {
+            font-size: 15px;
+        }
+
+        /* ===== Visualization Area ===== */
+        .viz-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .viz-panel {
+            position: absolute;
+            inset: 0;
+            display: none;
+            overflow: hidden;
+        }
+
+        .viz-panel.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .viz-canvas {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .viz-canvas svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* ===== Breadcrumb ===== */
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 16px;
+            font-size: 12px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            flex-wrap: wrap;
+        }
+
+        .breadcrumb-item {
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: all var(--transition);
+        }
+
+        .breadcrumb-item:hover {
+            color: var(--accent);
+            background: var(--accent-glow);
+        }
+
+        .breadcrumb-item.current {
+            color: var(--text-primary);
+            font-weight: 600;
+            cursor: default;
+        }
+
+        .breadcrumb-item.current:hover {
+            background: none;
+            color: var(--text-primary);
+        }
+
+        .breadcrumb-sep {
+            color: var(--text-muted);
+            font-size: 10px;
+        }
+
+        /* ===== Detail Panel ===== */
+        .detail-panel {
+            background: var(--detail-bg);
+            border-top: 1px solid var(--border);
+            padding: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+        }
+
+        .detail-panel.open {
+            max-height: var(--detail-height);
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .detail-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .detail-title {
+            font-size: 14px;
+            font-weight: 600;
+            font-family: var(--font-mono);
+            color: var(--accent);
+        }
+
+        .detail-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: all var(--transition);
+        }
+
+        .detail-close:hover {
+            color: var(--text-primary);
+            background: var(--bg-hover);
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 8px;
+        }
+
+        .detail-field {
+            font-size: 12px;
+        }
+
+        .detail-field-label {
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+
+        .detail-field-value {
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            word-break: break-all;
+        }
+
+        /* ===== Tooltip ===== */
+        .tooltip {
+            position: fixed;
+            pointer-events: none;
+            background: var(--tooltip-bg);
+            border: 1px solid var(--tooltip-border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 12px;
+            box-shadow: var(--shadow);
+            z-index: 1000;
+            max-width: 300px;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+        }
+
+        .tooltip-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+        }
+
+        .tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            color: var(--text-secondary);
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        .tooltip-label { color: var(--text-muted); }
+        .tooltip-value { font-family: var(--font-mono); color: var(--text-primary); }
+
+        /* ===== Treemap Specific ===== */
+        .treemap-rect {
+            stroke: var(--bg-primary);
+            stroke-width: 1px;
+            cursor: pointer;
+            transition: opacity 0.15s ease;
+        }
+
+        .treemap-rect:hover {
+            opacity: 0.85;
+        }
+
+        .treemap-rect.dir {
+            cursor: pointer;
+        }
+
+        .treemap-label {
+            pointer-events: none;
+            fill: #ffffff;
+            font-size: 11px;
+            font-family: var(--font-sans);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        /* ===== Force Graph Specific ===== */
+        .force-node {
+            cursor: pointer;
+            stroke: var(--bg-primary);
+            stroke-width: 1.5px;
+            transition: opacity 0.15s ease;
+        }
+
+        .force-node:hover {
+            opacity: 0.8;
+        }
+
+        .force-node.dimmed {
+            opacity: 0.15;
+        }
+
+        .force-link {
+            stroke: var(--border);
+            stroke-opacity: 0.4;
+            fill: none;
+        }
+
+        .force-link.dimmed {
+            stroke-opacity: 0.05;
+        }
+
+        .force-link.highlighted {
+            stroke: var(--accent);
+            stroke-opacity: 0.8;
+        }
+
+        .force-label {
+            pointer-events: none;
+            font-size: 10px;
+            font-family: var(--font-mono);
+            fill: var(--text-secondary);
+        }
+
+        .force-label.dimmed {
+            opacity: 0.1;
+        }
+
+        /* ===== Flow Specific ===== */
+        .flow-container {
+            padding: 20px;
+            overflow-y: auto;
+            height: 100%;
+        }
+
+        .flow-section {
+            margin-bottom: 32px;
+        }
+
+        .flow-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .flow-diagram {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            overflow-x: auto;
+        }
+
+        .flow-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            gap: 12px;
+        }
+
+        .flow-empty-icon {
+            font-size: 48px;
+            opacity: 0.3;
+        }
+
+        .flow-empty-text {
+            font-size: 14px;
+        }
+
+        /* ===== Architecture Specific ===== */
+        .arch-layer {
+            cursor: pointer;
+            transition: opacity 0.15s ease;
+        }
+
+        .arch-layer:hover {
+            opacity: 0.9;
+        }
+
+        .arch-component {
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .arch-component:hover {
+            filter: brightness(1.2);
+        }
+
+        .arch-label {
+            pointer-events: none;
+            font-family: var(--font-sans);
+        }
+
+        .arch-connection {
+            fill: none;
+            stroke-opacity: 0.3;
+            stroke-width: 1.5;
+        }
+
+        /* ===== Empty States ===== */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            gap: 8px;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            opacity: 0.3;
+        }
+
+        .empty-state-text {
+            font-size: 14px;
+            max-width: 300px;
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 800px) {
+            .app {
+                grid-template-columns: 1fr;
+            }
+            .sidebar {
+                display: none;
+            }
+            .search-box input {
+                width: 120px;
+            }
+        }
+
+        /* ===== Mermaid Theme Override ===== */
+        [data-theme="dark"] .flow-diagram .mermaid svg {
+            background: transparent !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <span class="header-logo">&#128269;</span>
+                <h1 class="header-title">System Visualizer - <span id="project-name">__PROJECT_NAME__</span></h1>
+            </div>
+            <div class="header-right">
+                <div class="search-box">
+                    <span class="search-icon">&#128270;</span>
+                    <input type="text" id="search-input" placeholder="Filter files..." />
+                </div>
+                <button class="theme-toggle" id="theme-toggle" title="Toggle theme">&#9790;</button>
+            </div>
+        </header>
+
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Project Summary</div>
+                <div class="stat-grid" id="stat-grid"></div>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Languages</div>
+                <ul class="lang-list" id="lang-list"></ul>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Configuration</div>
+                <ul class="config-list" id="config-list"></ul>
+            </div>
+            <div class="sidebar-section" id="entry-section" style="display:none;">
+                <div class="sidebar-section-title">Entry Points</div>
+                <ul class="entry-points-list" id="entry-list"></ul>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Tab Bar -->
+            <nav class="tab-bar">
+                <button class="tab-btn active" data-tab="structure">
+                    <span class="tab-icon">&#9638;</span> Structure
+                </button>
+                <button class="tab-btn" data-tab="dependencies">
+                    <span class="tab-icon">&#10132;</span> Dependencies
+                </button>
+                <button class="tab-btn" data-tab="flow">
+                    <span class="tab-icon">&#8644;</span> Flow
+                </button>
+                <button class="tab-btn" data-tab="architecture">
+                    <span class="tab-icon">&#9707;</span> Architecture
+                </button>
+            </nav>
+
+            <!-- Visualization Panels -->
+            <div class="viz-container">
+                <!-- Structure Tab -->
+                <div class="viz-panel active" id="panel-structure">
+                    <div class="breadcrumb" id="treemap-breadcrumb"></div>
+                    <div class="viz-canvas" id="treemap-canvas"></div>
+                </div>
+
+                <!-- Dependencies Tab -->
+                <div class="viz-panel" id="panel-dependencies">
+                    <div class="viz-canvas" id="force-canvas"></div>
+                </div>
+
+                <!-- Flow Tab -->
+                <div class="viz-panel" id="panel-flow">
+                    <div class="flow-container" id="flow-canvas"></div>
+                </div>
+
+                <!-- Architecture Tab -->
+                <div class="viz-panel" id="panel-architecture">
+                    <div class="viz-canvas" id="arch-canvas"></div>
+                </div>
+            </div>
+
+            <!-- Detail Panel -->
+            <div class="detail-panel" id="detail-panel">
+                <div class="detail-header">
+                    <span class="detail-title" id="detail-title"></span>
+                    <button class="detail-close" id="detail-close">&times;</button>
+                </div>
+                <div class="detail-grid" id="detail-grid"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Tooltip -->
+    <div class="tooltip" id="tooltip">
+        <div class="tooltip-title" id="tooltip-title"></div>
+        <div id="tooltip-body"></div>
+    </div>
+
+    <script>
+    // =========================================================================
+    // Data Injection (replaced by skill at generation time)
+    // =========================================================================
+    const PROJECT = __PROJECT_DATA__;
+    const ARCH = __ARCHITECTURE_DATA__;
+
+    // =========================================================================
+    // Language Color Palette
+    // =========================================================================
+    const LANG_COLORS = {
+        "TypeScript": "#3178c6",
+        "JavaScript": "#f7df1e",
+        "Python": "#3776ab",
+        "Go": "#00add8",
+        "Rust": "#dea584",
+        "Java": "#b07219",
+        "Ruby": "#cc342d",
+        "PHP": "#4f5d95",
+        "C": "#555555",
+        "C++": "#f34b7d",
+        "C#": "#178600",
+        "Swift": "#f05138",
+        "Kotlin": "#a97bff",
+        "Vue": "#42b883",
+        "Svelte": "#ff3e00",
+        "HTML": "#e34c26",
+        "CSS": "#563d7c",
+        "SCSS": "#c6538c",
+        "Shell": "#89e051",
+        "SQL": "#e38c00",
+        "Markdown": "#083fa1",
+        "JSON": "#a0a0a0",
+        "YAML": "#cb171e",
+        "TOML": "#9c4121",
+        "Dart": "#00b4ab",
+        "Scala": "#c22d40",
+        "Elixir": "#6e4a7e",
+        "Zig": "#f7a41d",
+        "Lua": "#000080",
+        "R": "#198ce7",
+        "LESS": "#1d365d",
+        "MDX": "#fcb32c",
+    };
+
+    const DEFAULT_LANG_COLOR = "#607080";
+
+    function langColor(lang) {
+        return LANG_COLORS[lang] || DEFAULT_LANG_COLOR;
+    }
+
+    // =========================================================================
+    // Layer Colors for Architecture
+    // =========================================================================
+    const LAYER_COLORS = {
+        "Presentation": { bg: "#4a90d9", text: "#ffffff", light: "#a8ccee" },
+        "Application":  { bg: "#50b87a", text: "#ffffff", light: "#a8dfc0" },
+        "Data":         { bg: "#e8a838", text: "#1a1a2e", light: "#f0d8a0" },
+        "Infrastructure": { bg: "#8b6caf", text: "#ffffff", light: "#c8b0e0" },
+    };
+
+    // =========================================================================
+    // Utility Helpers
+    // =========================================================================
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function formatNumber(n) {
+        return n != null ? n.toLocaleString() : '0';
+    }
+
+    // =========================================================================
+    // Tooltip
+    // =========================================================================
+    const tooltipEl = document.getElementById('tooltip');
+    const tooltipTitle = document.getElementById('tooltip-title');
+    const tooltipBody = document.getElementById('tooltip-body');
+
+    function showTooltip(evt, title, rows) {
+        tooltipTitle.textContent = title;
+        tooltipBody.innerHTML = rows.map(r =>
+            `<div class="tooltip-row"><span class="tooltip-label">${r[0]}</span><span class="tooltip-value">${r[1]}</span></div>`
+        ).join('');
+        tooltipEl.classList.add('visible');
+        positionTooltip(evt);
+    }
+
+    function positionTooltip(evt) {
+        const pad = 12;
+        let x = evt.clientX + pad;
+        let y = evt.clientY + pad;
+        const rect = tooltipEl.getBoundingClientRect();
+        if (x + rect.width > window.innerWidth) x = evt.clientX - rect.width - pad;
+        if (y + rect.height > window.innerHeight) y = evt.clientY - rect.height - pad;
+        tooltipEl.style.left = x + 'px';
+        tooltipEl.style.top = y + 'px';
+    }
+
+    function moveTooltip(evt) {
+        if (tooltipEl.classList.contains('visible')) positionTooltip(evt);
+    }
+
+    function hideTooltip() {
+        tooltipEl.classList.remove('visible');
+    }
+
+    // =========================================================================
+    // Detail Panel
+    // =========================================================================
+    const detailPanel = document.getElementById('detail-panel');
+    const detailTitle = document.getElementById('detail-title');
+    const detailGrid = document.getElementById('detail-grid');
+    const detailClose = document.getElementById('detail-close');
+
+    function showDetail(title, fields) {
+        detailTitle.textContent = title;
+        detailGrid.innerHTML = fields.map(f =>
+            `<div class="detail-field"><div class="detail-field-label">${f[0]}</div><div class="detail-field-value">${f[1]}</div></div>`
+        ).join('');
+        detailPanel.classList.add('open');
+    }
+
+    function hideDetail() {
+        detailPanel.classList.remove('open');
+    }
+
+    detailClose.addEventListener('click', hideDetail);
+
+    // =========================================================================
+    // Theme Toggle
+    // =========================================================================
+    const themeToggle = document.getElementById('theme-toggle');
+    const html = document.documentElement;
+
+    function setTheme(theme) {
+        html.setAttribute('data-theme', theme);
+        themeToggle.innerHTML = theme === 'dark' ? '&#9790;' : '&#9728;';
+        localStorage.setItem('sv-theme', theme);
+    }
+
+    themeToggle.addEventListener('click', () => {
+        const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        setTheme(next);
+        // Re-render Mermaid diagrams on theme change
+        if (document.querySelector('.tab-btn.active').dataset.tab === 'flow') {
+            renderFlowTab();
+        }
+    });
+
+    // Restore saved theme
+    const savedTheme = localStorage.getItem('sv-theme');
+    if (savedTheme) setTheme(savedTheme);
+
+    // =========================================================================
+    // Tab Switching
+    // =========================================================================
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const panels = document.querySelectorAll('.viz-panel');
+    let activeTab = 'structure';
+    const tabInitialized = {};
+
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.dataset.tab;
+            if (tab === activeTab) return;
+            activeTab = tab;
+            tabBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            panels.forEach(p => p.classList.remove('active'));
+            document.getElementById('panel-' + tab).classList.add('active');
+            hideDetail();
+            initTab(tab);
+        });
+    });
+
+    function initTab(tab) {
+        if (tabInitialized[tab]) {
+            // For structure and deps, handle resize
+            if (tab === 'structure') renderTreemap();
+            if (tab === 'dependencies') renderForceGraph();
+            if (tab === 'architecture') renderArchitecture();
+            return;
+        }
+        tabInitialized[tab] = true;
+        switch (tab) {
+            case 'structure': renderTreemap(); break;
+            case 'dependencies': renderForceGraph(); break;
+            case 'flow': renderFlowTab(); break;
+            case 'architecture': renderArchitecture(); break;
+        }
+    }
+
+    // =========================================================================
+    // Search / Filter
+    // =========================================================================
+    const searchInput = document.getElementById('search-input');
+    let searchTerm = '';
+
+    searchInput.addEventListener('input', () => {
+        searchTerm = searchInput.value.toLowerCase().trim();
+        if (activeTab === 'structure') renderTreemap();
+        if (activeTab === 'dependencies') applyForceFilter();
+    });
+
+    // =========================================================================
+    // Sidebar Population
+    // =========================================================================
+    function populateSidebar() {
+        const s = PROJECT.summary || {};
+        const statGrid = document.getElementById('stat-grid');
+        statGrid.innerHTML = `
+            <div class="stat-card"><div class="stat-value">${formatNumber(s.totalFiles)}</div><div class="stat-label">Files</div></div>
+            <div class="stat-card"><div class="stat-value">${formatNumber(s.totalDirs)}</div><div class="stat-label">Directories</div></div>
+            <div class="stat-card"><div class="stat-value">${formatNumber(s.totalLines)}</div><div class="stat-label">Lines of Code</div></div>
+            <div class="stat-card"><div class="stat-value">${formatNumber((PROJECT.dependencies || []).length)}</div><div class="stat-label">Dependencies</div></div>
+        `;
+
+        // Languages
+        const langList = document.getElementById('lang-list');
+        const langs = s.languages || {};
+        langList.innerHTML = Object.entries(langs).map(([name, count]) =>
+            `<li class="lang-item">
+                <span class="lang-dot" style="background:${langColor(name)}"></span>
+                <span class="lang-name">${name}</span>
+                <span class="lang-count">${count}</span>
+            </li>`
+        ).join('');
+
+        // Config
+        const configList = document.getElementById('config-list');
+        const cfg = PROJECT.config || {};
+        const items = [];
+        if (cfg.packageManager) items.push(['&#128230;', cfg.packageManager]);
+        if (cfg.framework) items.push(['&#9881;', cfg.framework]);
+        if (cfg.hasTests) items.push(['&#9989;', 'Tests detected']);
+        if (cfg.hasDocker) items.push(['&#128051;', 'Docker configured']);
+        if (items.length === 0) items.push(['&#8213;', 'No config detected']);
+        configList.innerHTML = items.map(([icon, label]) =>
+            `<li class="config-item"><span class="config-icon">${icon}</span>${label}</li>`
+        ).join('');
+
+        // Entry points
+        const eps = PROJECT.entryPoints || [];
+        if (eps.length > 0) {
+            document.getElementById('entry-section').style.display = '';
+            document.getElementById('entry-list').innerHTML = eps.map(e =>
+                `<li class="entry-point">${e}</li>`
+            ).join('');
+        }
+    }
+
+    populateSidebar();
+
+    // =========================================================================
+    // TAB 1: STRUCTURE - D3.js Treemap with drill-down
+    // =========================================================================
+    let treemapRoot = null;
+    let treemapCurrent = null;
+    let treemapBreadcrumb = [];
+
+    function buildTreemapHierarchy(node) {
+        // Convert the scanned tree into a D3 hierarchy
+        if (node.type === 'file') {
+            return {
+                name: node.name,
+                path: node.path,
+                value: Math.max(node.size || 1, 1),
+                language: node.language,
+                lines: node.lines,
+                size: node.size,
+                type: 'file'
+            };
+        }
+        const children = (node.children || []).map(c => buildTreemapHierarchy(c)).filter(Boolean);
+        return {
+            name: node.name,
+            path: node.path,
+            children: children.length > 0 ? children : [{ name: '(empty)', value: 1, type: 'empty' }],
+            type: 'dir'
+        };
+    }
+
+    function filterTreemapNode(node) {
+        if (!searchTerm) return node;
+        if (node.type === 'file') {
+            return (node.name && node.name.toLowerCase().includes(searchTerm)) ? node : null;
+        }
+        if (node.type === 'dir') {
+            const filtered = (node.children || []).map(c => filterTreemapNode(c)).filter(Boolean);
+            if (filtered.length > 0 || (node.name && node.name.toLowerCase().includes(searchTerm))) {
+                return { ...node, children: filtered.length > 0 ? filtered : [{ name: '(empty)', value: 1, type: 'empty' }] };
+            }
+            return null;
+        }
+        return null;
+    }
+
+    function renderTreemap() {
+        const canvas = document.getElementById('treemap-canvas');
+        canvas.innerHTML = '';
+        const rect = canvas.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+        if (width <= 0 || height <= 0) return;
+
+        if (!treemapRoot) {
+            treemapRoot = buildTreemapHierarchy(PROJECT.tree);
+            treemapCurrent = treemapRoot;
+            treemapBreadcrumb = [treemapRoot];
+        }
+
+        // Apply search filter
+        let displayNode = filterTreemapNode(treemapCurrent);
+        if (!displayNode) {
+            canvas.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128270;</div><div class="empty-state-text">No files match the search term</div></div>';
+            return;
+        }
+
+        const root = d3.hierarchy(displayNode)
+            .sum(d => d.value || 0)
+            .sort((a, b) => b.value - a.value);
+
+        d3.treemap()
+            .size([width, height])
+            .paddingInner(2)
+            .paddingTop(d => d.depth === 0 ? 0 : 20)
+            .round(true)(root);
+
+        const svg = d3.select(canvas).append('svg')
+            .attr('width', width)
+            .attr('height', height);
+
+        const leaves = root.leaves();
+
+        // Draw rectangles
+        const rects = svg.selectAll('g')
+            .data(leaves.filter(d => d.data.type !== 'empty'))
+            .join('g')
+            .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+        rects.append('rect')
+            .attr('class', d => 'treemap-rect' + (d.data.type === 'dir' ? ' dir' : ''))
+            .attr('width', d => Math.max(0, d.x1 - d.x0))
+            .attr('height', d => Math.max(0, d.y1 - d.y0))
+            .attr('fill', d => {
+                if (d.data.type === 'dir') return 'var(--bg-surface)';
+                return langColor(d.data.language) || DEFAULT_LANG_COLOR;
+            })
+            .attr('rx', 2)
+            .on('mouseover', (evt, d) => {
+                const rows = [];
+                if (d.data.path) rows.push(['Path', d.data.path]);
+                if (d.data.size != null) rows.push(['Size', formatBytes(d.data.size)]);
+                if (d.data.lines != null) rows.push(['Lines', formatNumber(d.data.lines)]);
+                if (d.data.language) rows.push(['Language', d.data.language]);
+                showTooltip(evt, d.data.name, rows);
+            })
+            .on('mousemove', moveTooltip)
+            .on('mouseout', hideTooltip)
+            .on('click', (evt, d) => {
+                evt.stopPropagation();
+                if (d.data.type === 'file') {
+                    // Show detail panel
+                    const fields = [
+                        ['Path', d.data.path || ''],
+                        ['Size', formatBytes(d.data.size || 0)],
+                        ['Lines', formatNumber(d.data.lines)],
+                        ['Language', d.data.language || 'Unknown'],
+                    ];
+                    // Find dependencies
+                    const deps = (PROJECT.dependencies || []).filter(dep => dep.from === d.data.path || dep.to === d.data.path);
+                    if (deps.length > 0) {
+                        const imports = deps.filter(dep => dep.from === d.data.path).map(dep => dep.to);
+                        const importedBy = deps.filter(dep => dep.to === d.data.path).map(dep => dep.from);
+                        if (imports.length > 0) fields.push(['Imports', imports.join(', ')]);
+                        if (importedBy.length > 0) fields.push(['Imported by', importedBy.join(', ')]);
+                    }
+                    showDetail(d.data.name, fields);
+                }
+            });
+
+        // Labels (only show if rect is big enough)
+        rects.append('text')
+            .attr('class', 'treemap-label')
+            .attr('x', 4)
+            .attr('y', 14)
+            .text(d => d.data.name)
+            .each(function(d) {
+                const textLen = this.getComputedTextLength();
+                const rectWidth = d.x1 - d.x0;
+                const rectHeight = d.y1 - d.y0;
+                if (textLen > rectWidth - 6 || rectHeight < 18) {
+                    d3.select(this).remove();
+                }
+            });
+
+        // Draw directory borders on top level children for drill-down
+        if (displayNode.children) {
+            const dirChildren = root.children || [];
+            const dirGroups = svg.selectAll('.dir-overlay')
+                .data(dirChildren.filter(d => d.data.type === 'dir'))
+                .join('g')
+                .attr('class', 'dir-overlay');
+
+            dirGroups.append('rect')
+                .attr('x', d => d.x0)
+                .attr('y', d => d.y0)
+                .attr('width', d => Math.max(0, d.x1 - d.x0))
+                .attr('height', 18)
+                .attr('fill', 'var(--bg-surface)')
+                .attr('opacity', 0.85)
+                .style('cursor', 'pointer')
+                .on('click', (evt, d) => drillDown(d.data));
+
+            dirGroups.append('text')
+                .attr('x', d => d.x0 + 4)
+                .attr('y', d => d.y0 + 13)
+                .attr('fill', 'var(--text-primary)')
+                .attr('font-size', '11px')
+                .attr('font-weight', '600')
+                .attr('font-family', 'var(--font-sans)')
+                .style('pointer-events', 'none')
+                .text(d => {
+                    const w = d.x1 - d.x0;
+                    return w > 40 ? d.data.name : '';
+                });
+        }
+
+        renderBreadcrumb();
+    }
+
+    function drillDown(dirNode) {
+        treemapCurrent = dirNode;
+        treemapBreadcrumb.push(dirNode);
+        renderTreemap();
+    }
+
+    function drillTo(index) {
+        treemapBreadcrumb = treemapBreadcrumb.slice(0, index + 1);
+        treemapCurrent = treemapBreadcrumb[treemapBreadcrumb.length - 1];
+        renderTreemap();
+    }
+
+    function renderBreadcrumb() {
+        const el = document.getElementById('treemap-breadcrumb');
+        el.innerHTML = treemapBreadcrumb.map((node, i) => {
+            const isLast = i === treemapBreadcrumb.length - 1;
+            const sep = i > 0 ? '<span class="breadcrumb-sep">&#9656;</span>' : '';
+            const cls = isLast ? 'breadcrumb-item current' : 'breadcrumb-item';
+            return `${sep}<span class="${cls}" data-index="${i}">${node.name}</span>`;
+        }).join('');
+
+        el.querySelectorAll('.breadcrumb-item:not(.current)').forEach(item => {
+            item.addEventListener('click', () => drillTo(parseInt(item.dataset.index)));
+        });
+    }
+
+    // =========================================================================
+    // TAB 2: DEPENDENCIES - D3.js Force-Directed Graph
+    // =========================================================================
+    let forceSimulation = null;
+    let forceNodes = [];
+    let forceLinks = [];
+    let forceSvg = null;
+    let forceG = null;
+    let forceNodeEls = null;
+    let forceLinkEls = null;
+    let forceLabelEls = null;
+
+    function renderForceGraph() {
+        const canvas = document.getElementById('force-canvas');
+        const rect = canvas.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+        if (width <= 0 || height <= 0) return;
+
+        const deps = PROJECT.dependencies || [];
+        if (deps.length === 0) {
+            canvas.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128279;</div><div class="empty-state-text">No import dependencies detected in this project</div></div>';
+            return;
+        }
+
+        canvas.innerHTML = '';
+
+        // Build unique nodes
+        const nodeSet = new Set();
+        deps.forEach(d => { nodeSet.add(d.from); nodeSet.add(d.to); });
+
+        // File info lookup from tree
+        const fileInfo = {};
+        function walkTree(node) {
+            if (node.type === 'file') fileInfo[node.path] = node;
+            (node.children || []).forEach(walkTree);
+        }
+        walkTree(PROJECT.tree);
+
+        const nodeArray = Array.from(nodeSet);
+        const nodeMap = {};
+        forceNodes = nodeArray.map((path, i) => {
+            const info = fileInfo[path] || {};
+            const incoming = deps.filter(d => d.to === path).length;
+            const outgoing = deps.filter(d => d.from === path).length;
+            const obj = {
+                id: path,
+                name: path.split('/').pop(),
+                language: info.language || null,
+                lines: info.lines || 0,
+                size: info.size || 0,
+                connections: incoming + outgoing,
+                incoming,
+                outgoing,
+                index: i
+            };
+            nodeMap[path] = obj;
+            return obj;
+        });
+
+        forceLinks = deps.map(d => ({
+            source: nodeMap[d.from],
+            target: nodeMap[d.to],
+            raw: d.raw
+        })).filter(l => l.source && l.target);
+
+        // SVG
+        forceSvg = d3.select(canvas).append('svg')
+            .attr('width', width)
+            .attr('height', height);
+
+        // Zoom
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 5])
+            .on('zoom', (evt) => forceG.attr('transform', evt.transform));
+
+        forceSvg.call(zoom);
+
+        forceG = forceSvg.append('g');
+
+        // Arrow marker
+        forceG.append('defs').append('marker')
+            .attr('id', 'arrowhead')
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 20)
+            .attr('refY', 0)
+            .attr('markerWidth', 6)
+            .attr('markerHeight', 6)
+            .attr('orient', 'auto')
+            .append('path')
+            .attr('d', 'M0,-5L10,0L0,5')
+            .attr('fill', 'var(--border)');
+
+        // Links
+        forceLinkEls = forceG.append('g')
+            .selectAll('line')
+            .data(forceLinks)
+            .join('line')
+            .attr('class', 'force-link')
+            .attr('marker-end', 'url(#arrowhead)');
+
+        // Nodes
+        const maxConn = d3.max(forceNodes, d => d.connections) || 1;
+        const radiusScale = d3.scaleSqrt().domain([0, maxConn]).range([4, 18]);
+
+        forceNodeEls = forceG.append('g')
+            .selectAll('circle')
+            .data(forceNodes)
+            .join('circle')
+            .attr('class', 'force-node')
+            .attr('r', d => radiusScale(d.connections))
+            .attr('fill', d => langColor(d.language))
+            .on('mouseover', (evt, d) => {
+                showTooltip(evt, d.name, [
+                    ['Path', d.id],
+                    ['Language', d.language || 'Unknown'],
+                    ['Imports', d.outgoing],
+                    ['Imported by', d.incoming],
+                    ['Lines', formatNumber(d.lines)],
+                ]);
+                highlightConnections(d);
+            })
+            .on('mousemove', moveTooltip)
+            .on('mouseout', () => {
+                hideTooltip();
+                clearHighlight();
+            })
+            .on('click', (evt, d) => {
+                evt.stopPropagation();
+                const fields = [
+                    ['Path', d.id],
+                    ['Language', d.language || 'Unknown'],
+                    ['Size', formatBytes(d.size)],
+                    ['Lines', formatNumber(d.lines)],
+                    ['Imports', d.outgoing + ' files'],
+                    ['Imported by', d.incoming + ' files'],
+                ];
+                const importList = forceLinks.filter(l => l.source.id === d.id).map(l => l.target.id);
+                const importedByList = forceLinks.filter(l => l.target.id === d.id).map(l => l.source.id);
+                if (importList.length) fields.push(['Imports list', importList.join(', ')]);
+                if (importedByList.length) fields.push(['Imported by list', importedByList.join(', ')]);
+                showDetail(d.name, fields);
+            })
+            .call(d3.drag()
+                .on('start', (evt, d) => {
+                    if (!evt.active) forceSimulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                })
+                .on('drag', (evt, d) => {
+                    d.fx = evt.x;
+                    d.fy = evt.y;
+                })
+                .on('end', (evt, d) => {
+                    if (!evt.active) forceSimulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                })
+            );
+
+        // Labels
+        forceLabelEls = forceG.append('g')
+            .selectAll('text')
+            .data(forceNodes)
+            .join('text')
+            .attr('class', 'force-label')
+            .attr('dx', d => radiusScale(d.connections) + 4)
+            .attr('dy', '0.35em')
+            .text(d => d.name);
+
+        // Simulation
+        forceSimulation = d3.forceSimulation(forceNodes)
+            .force('link', d3.forceLink(forceLinks).id(d => d.id).distance(80))
+            .force('charge', d3.forceManyBody().strength(-150))
+            .force('center', d3.forceCenter(width / 2, height / 2))
+            .force('collision', d3.forceCollide().radius(d => radiusScale(d.connections) + 2))
+            .on('tick', () => {
+                forceLinkEls
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+                forceNodeEls
+                    .attr('cx', d => d.x)
+                    .attr('cy', d => d.y);
+                forceLabelEls
+                    .attr('x', d => d.x)
+                    .attr('y', d => d.y);
+            });
+
+        // Fit to view
+        forceSvg.call(zoom.transform, d3.zoomIdentity);
+    }
+
+    function highlightConnections(d) {
+        const connected = new Set();
+        connected.add(d.id);
+        forceLinks.forEach(l => {
+            if (l.source.id === d.id) connected.add(l.target.id);
+            if (l.target.id === d.id) connected.add(l.source.id);
+        });
+
+        forceNodeEls.classed('dimmed', n => !connected.has(n.id));
+        forceLinkEls.classed('dimmed', l => l.source.id !== d.id && l.target.id !== d.id);
+        forceLinkEls.classed('highlighted', l => l.source.id === d.id || l.target.id === d.id);
+        forceLabelEls.classed('dimmed', n => !connected.has(n.id));
+    }
+
+    function clearHighlight() {
+        if (!forceNodeEls) return;
+        forceNodeEls.classed('dimmed', false);
+        forceLinkEls.classed('dimmed', false);
+        forceLinkEls.classed('highlighted', false);
+        forceLabelEls.classed('dimmed', false);
+    }
+
+    function applyForceFilter() {
+        if (!forceNodeEls) return;
+        forceNodeEls.style('display', d => {
+            if (!searchTerm) return null;
+            return d.id.toLowerCase().includes(searchTerm) ? null : 'none';
+        });
+        forceLabelEls.style('display', d => {
+            if (!searchTerm) return null;
+            return d.id.toLowerCase().includes(searchTerm) ? null : 'none';
+        });
+        forceLinkEls.style('display', d => {
+            if (!searchTerm) return null;
+            const srcMatch = d.source.id.toLowerCase().includes(searchTerm);
+            const tgtMatch = d.target.id.toLowerCase().includes(searchTerm);
+            return (srcMatch || tgtMatch) ? null : 'none';
+        });
+    }
+
+    // =========================================================================
+    // TAB 3: FLOW - Mermaid Sequence Diagrams
+    // =========================================================================
+    function renderFlowTab() {
+        const canvas = document.getElementById('flow-canvas');
+        const flows = (ARCH && ARCH.flows) || [];
+
+        if (flows.length === 0) {
+            canvas.innerHTML = `
+                <div class="flow-empty">
+                    <div class="flow-empty-icon">&#128260;</div>
+                    <div class="flow-empty-text">No data flows detected</div>
+                </div>`;
+            return;
+        }
+
+        const isDark = html.getAttribute('data-theme') === 'dark';
+
+        // Initialize Mermaid
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark ? {
+                primaryColor: '#6c63ff',
+                primaryTextColor: '#e8e8f0',
+                lineColor: '#4a4a7a',
+                signalColor: '#e8e8f0',
+                actorBkg: '#1a1a2e',
+                actorBorder: '#4a4a7a',
+                actorTextColor: '#e8e8f0',
+                sequenceNumberColor: '#6c63ff',
+            } : {},
+            sequence: {
+                diagramMarginX: 20,
+                diagramMarginY: 10,
+                actorMargin: 60,
+                width: 150,
+                height: 40,
+                boxMargin: 10,
+                useMaxWidth: true,
+            },
+        });
+
+        // Build HTML for each flow
+        canvas.innerHTML = flows.map((flow, idx) => {
+            // Generate a Mermaid sequence diagram from flow steps
+            let mermaidCode = 'sequenceDiagram\n';
+
+            if (flow.steps && flow.steps.length > 0) {
+                // Build participants from step components
+                const participants = [];
+                flow.steps.forEach(step => {
+                    const comp = step.component || step.name || 'Unknown';
+                    if (!participants.includes(comp)) participants.push(comp);
+                });
+
+                // Add participant declarations
+                participants.forEach(p => {
+                    mermaidCode += `    participant ${sanitizeMermaidId(p)} as ${p}\n`;
+                });
+
+                // Create arrows between consecutive steps
+                for (let i = 0; i < flow.steps.length - 1; i++) {
+                    const from = sanitizeMermaidId(flow.steps[i].component || flow.steps[i].name || 'Unknown');
+                    const to = sanitizeMermaidId(flow.steps[i + 1].component || flow.steps[i + 1].name || 'Unknown');
+                    const action = flow.steps[i].action || flow.steps[i].description || '';
+                    mermaidCode += `    ${from}->>${to}: ${escapeForMermaid(action)}\n`;
+                }
+            } else if (flow.mermaid) {
+                // If raw mermaid code is provided, use it directly
+                mermaidCode = flow.mermaid;
+            }
+
+            return `
+                <div class="flow-section">
+                    <div class="flow-title">${flow.name || 'Flow ' + (idx + 1)}</div>
+                    <div class="flow-diagram">
+                        <pre class="mermaid" id="mermaid-${idx}">${mermaidCode}</pre>
+                    </div>
+                </div>`;
+        }).join('');
+
+        // Render Mermaid diagrams
+        mermaid.run({ nodes: canvas.querySelectorAll('.mermaid') });
+    }
+
+    function sanitizeMermaidId(str) {
+        // Mermaid IDs cannot have spaces or special characters
+        return str.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^_+|_+$/g, '') || 'X';
+    }
+
+    function escapeForMermaid(str) {
+        // Remove characters that break Mermaid syntax
+        return (str || '').replace(/[;#]/g, ' ').replace(/[\n\r]/g, ' ');
+    }
+
+    // =========================================================================
+    // TAB 4: ARCHITECTURE - Layer Diagram
+    // =========================================================================
+    function renderArchitecture() {
+        const canvas = document.getElementById('arch-canvas');
+        canvas.innerHTML = '';
+        const rect = canvas.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+        if (width <= 0 || height <= 0) return;
+
+        const layers = (ARCH && ARCH.layers) || [];
+
+        if (layers.length === 0) {
+            canvas.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">&#127959;</div>
+                    <div class="empty-state-text">No architecture layers detected. Architecture inference has not been run or no layers were identified.</div>
+                </div>`;
+            return;
+        }
+
+        // Standard layer ordering (top to bottom in rendering = Presentation at top, Infrastructure at bottom)
+        const layerOrder = ['Presentation', 'Application', 'Data', 'Infrastructure'];
+        const sortedLayers = [];
+        layerOrder.forEach(name => {
+            const found = layers.find(l => l.name === name);
+            if (found) sortedLayers.push(found);
+        });
+        // Add any layers not in standard order
+        layers.forEach(l => {
+            if (!sortedLayers.includes(l)) sortedLayers.push(l);
+        });
+
+        const margin = { top: 30, right: 30, bottom: 30, left: 30 };
+        const innerW = width - margin.left - margin.right;
+        const innerH = height - margin.top - margin.bottom;
+        const layerCount = sortedLayers.length;
+        const layerGap = 12;
+        const layerH = (innerH - (layerCount - 1) * layerGap) / layerCount;
+        const componentPadding = 16;
+        const componentH = Math.min(36, layerH - 30);
+
+        const svg = d3.select(canvas).append('svg')
+            .attr('width', width)
+            .attr('height', height);
+
+        // Zoom support
+        const zoomG = svg.append('g');
+        svg.call(d3.zoom()
+            .scaleExtent([0.3, 3])
+            .on('zoom', evt => zoomG.attr('transform', evt.transform)));
+
+        const g = zoomG.append('g')
+            .attr('transform', `translate(${margin.left},${margin.top})`);
+
+        // Track component positions for cross-layer connections
+        const componentPositions = {};
+
+        sortedLayers.forEach((layer, i) => {
+            const y = i * (layerH + layerGap);
+            const colors = LAYER_COLORS[layer.name] || { bg: '#607080', text: '#ffffff', light: '#a0b0c0' };
+            const isDark = html.getAttribute('data-theme') === 'dark';
+
+            // Layer background
+            const layerG = g.append('g').attr('class', 'arch-layer');
+
+            layerG.append('rect')
+                .attr('x', 0)
+                .attr('y', y)
+                .attr('width', innerW)
+                .attr('height', layerH)
+                .attr('rx', 8)
+                .attr('fill', isDark ? colors.bg : colors.light)
+                .attr('opacity', isDark ? 0.15 : 0.3)
+                .attr('stroke', isDark ? colors.bg : colors.light)
+                .attr('stroke-width', 1)
+                .attr('stroke-opacity', 0.5);
+
+            // Layer label
+            layerG.append('text')
+                .attr('class', 'arch-label')
+                .attr('x', 12)
+                .attr('y', y + 18)
+                .attr('fill', isDark ? colors.bg : colors.bg)
+                .attr('font-size', '13px')
+                .attr('font-weight', '700')
+                .attr('opacity', 0.9)
+                .text(layer.name);
+
+            // Layer description (if short)
+            if (layer.description) {
+                layerG.append('text')
+                    .attr('class', 'arch-label')
+                    .attr('x', 12)
+                    .attr('y', y + 33)
+                    .attr('fill', 'var(--text-muted)')
+                    .attr('font-size', '10px')
+                    .text(layer.description.substring(0, 80));
+            }
+
+            // Components within the layer
+            const items = layer.items || [];
+            const compW = items.length > 0
+                ? Math.min(160, (innerW - componentPadding * 2 - (items.length - 1) * 8) / items.length)
+                : 0;
+            const compStartX = componentPadding;
+            const compY = y + (layerH - componentH) / 2 + 8;
+
+            items.forEach((item, j) => {
+                const cx = compStartX + j * (compW + 8);
+                const itemName = typeof item === 'string' ? item : (item.name || item.path || 'unknown');
+
+                // Store position for cross-layer lines
+                componentPositions[itemName] = {
+                    x: cx + compW / 2,
+                    y: compY + componentH / 2,
+                    layer: layer.name
+                };
+
+                const compG = g.append('g')
+                    .attr('class', 'arch-component')
+                    .on('mouseover', (evt) => {
+                        showTooltip(evt, itemName, [
+                            ['Layer', layer.name],
+                            ['Type', 'Directory / Module'],
+                        ]);
+                    })
+                    .on('mousemove', moveTooltip)
+                    .on('mouseout', hideTooltip)
+                    .on('click', (evt) => {
+                        evt.stopPropagation();
+                        showDetail(itemName, [
+                            ['Layer', layer.name],
+                            ['Description', layer.description || 'N/A'],
+                        ]);
+                    });
+
+                compG.append('rect')
+                    .attr('x', cx)
+                    .attr('y', compY)
+                    .attr('width', compW)
+                    .attr('height', componentH)
+                    .attr('rx', 6)
+                    .attr('fill', colors.bg)
+                    .attr('opacity', isDark ? 0.7 : 0.8);
+
+                compG.append('text')
+                    .attr('class', 'arch-label')
+                    .attr('x', cx + compW / 2)
+                    .attr('y', compY + componentH / 2 + 4)
+                    .attr('text-anchor', 'middle')
+                    .attr('fill', colors.text)
+                    .attr('font-size', '11px')
+                    .attr('font-weight', '500')
+                    .text(() => {
+                        const display = itemName.replace(/\/$/, '').split('/').pop();
+                        return display.length > compW / 7 ? display.substring(0, Math.floor(compW / 7)) + '..' : display;
+                    });
+            });
+        });
+
+        // Draw cross-layer connections based on dependencies
+        const deps = PROJECT.dependencies || [];
+        // Map file paths to their layer components
+        const fileToComponent = {};
+        sortedLayers.forEach(layer => {
+            (layer.items || []).forEach(item => {
+                const itemName = typeof item === 'string' ? item : (item.name || item.path || '');
+                // Map: files starting with this item prefix belong to this component
+                deps.forEach(dep => {
+                    [dep.from, dep.to].forEach(path => {
+                        if (path.startsWith(itemName) || path.startsWith(itemName.replace(/\/$/, '') + '/')) {
+                            fileToComponent[path] = itemName;
+                        }
+                    });
+                });
+            });
+        });
+
+        // Draw connection lines
+        const connectionSet = new Set();
+        deps.forEach(dep => {
+            const fromComp = fileToComponent[dep.from];
+            const toComp = fileToComponent[dep.to];
+            if (fromComp && toComp && fromComp !== toComp) {
+                const key = fromComp + '|' + toComp;
+                if (connectionSet.has(key)) return;
+                connectionSet.add(key);
+
+                const from = componentPositions[fromComp];
+                const to = componentPositions[toComp];
+                if (from && to && from.layer !== to.layer) {
+                    g.append('line')
+                        .attr('class', 'arch-connection')
+                        .attr('x1', from.x)
+                        .attr('y1', from.y)
+                        .attr('x2', to.x)
+                        .attr('y2', to.y)
+                        .attr('stroke', 'var(--accent)')
+                        .attr('stroke-dasharray', '4,3');
+                }
+            }
+        });
+
+        // Insights section
+        const insights = (ARCH && ARCH.insights) || {};
+        const hubs = insights.hubs || [];
+        const circular = insights.circular || [];
+        const orphans = insights.orphans || [];
+
+        if (hubs.length || circular.length || orphans.length) {
+            const insightY = margin.top + innerH + 10;
+            const insightG = zoomG.append('g')
+                .attr('transform', `translate(${margin.left}, ${insightY})`);
+
+            let textY = 0;
+
+            if (hubs.length > 0) {
+                insightG.append('text')
+                    .attr('y', textY)
+                    .attr('fill', 'var(--warning)')
+                    .attr('font-size', '11px')
+                    .attr('font-weight', '600')
+                    .text('Hub files: ' + hubs.map(h => (h.path || h) + (h.importedBy ? ` (${h.importedBy})` : '')).join(', '));
+                textY += 16;
+            }
+
+            if (circular.length > 0) {
+                insightG.append('text')
+                    .attr('y', textY)
+                    .attr('fill', 'var(--danger)')
+                    .attr('font-size', '11px')
+                    .attr('font-weight', '600')
+                    .text('Circular deps: ' + circular.map(c => Array.isArray(c) ? c.join(' <-> ') : c).join('; '));
+                textY += 16;
+            }
+
+            if (orphans.length > 0) {
+                insightG.append('text')
+                    .attr('y', textY)
+                    .attr('fill', 'var(--text-muted)')
+                    .attr('font-size', '11px')
+                    .text('Orphan files: ' + orphans.slice(0, 5).join(', ') + (orphans.length > 5 ? ` (+${orphans.length - 5} more)` : ''));
+            }
+        }
+    }
+
+    // =========================================================================
+    // Initialization
+    // =========================================================================
+    initTab('structure');
+
+    // Handle window resize
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            if (activeTab === 'structure') renderTreemap();
+            if (activeTab === 'dependencies') {
+                tabInitialized['dependencies'] = false;
+                if (forceSimulation) forceSimulation.stop();
+                renderForceGraph();
+            }
+            if (activeTab === 'architecture') renderArchitecture();
+        }, 200);
+    });
+    </script>
+</body>
+</html>
