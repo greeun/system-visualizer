@@ -22,3 +22,14 @@ docs/.bkit-memory.json
 
 # 외부 axt 도구가 남기는 머신별 확장 프로필
 .axt-profile.json
+
+# superpowers (auto-installed; do not track)
+.superpowers/
+docs/superpowers/
+
+.axt-profile.json*
+
+# env files
+.env*
+!.env*.example
+!.env*.template
